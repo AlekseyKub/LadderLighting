@@ -49,20 +49,66 @@ void PortInit(void)
 	  		GPIOA->CRL &= (~(GPIO_CRL_MODE3));
 	  		GPIOA->BSRR |= GPIO_ODR_ODR3;
 
-
+	  // Светодиод на плате
 	  GPIOC->CRH |= GPIO_CRH_MODE13_1;      // выход максимально 50mhz
 	  GPIOC->CRH |= GPIO_CRH_MODE13_0;
 
 	  GPIOC->CRH &=~ GPIO_CRH_CNF13_1;		// настройка на выход порта С13
 	  GPIOC->CRH &=~ GPIO_CRH_CNF13_0;
 
-	  GPIOA->CRH |= GPIO_CRH_MODE11_1;      // выход максимально 50mhz
-	  GPIOA->CRH |= GPIO_CRH_MODE11_0;
+	  // Настройка выводов под ШИМ
+	  // TIM1
 
-	  GPIOA->CRH &=~ GPIO_CRH_CNF11_1;		// настройка на выход порта С13
-	  GPIOA->CRH &=~ GPIO_CRH_CNF11_0;
+	  GPIOA->CRH &= ~GPIO_CRH_CNF8;
+	  GPIOA->CRH |= GPIO_CRH_CNF8_1;
+
+	  GPIOA->CRH &= ~GPIO_CRH_MODE8;
+	  GPIOA->CRH |= GPIO_CRH_MODE8_1;
 
 
+	  GPIOA->CRH &= ~GPIO_CRH_CNF9;
+	  GPIOA->CRH |= GPIO_CRH_CNF9_1;
+
+	  GPIOA->CRH &= ~GPIO_CRH_MODE9;
+	  GPIOA->CRH |= GPIO_CRH_MODE9_1;
+
+
+	  GPIOA->CRH &= ~GPIO_CRH_CNF10;
+	  GPIOA->CRH |= GPIO_CRH_CNF10_1;
+
+	  GPIOA->CRH &= ~GPIO_CRH_MODE10;
+	  GPIOA->CRH |= GPIO_CRH_MODE10_1;
+
+
+	  GPIOA->CRH &= ~GPIO_CRH_CNF11;
+	  GPIOA->CRH |= GPIO_CRH_CNF11_1;
+
+	  GPIOA->CRH	&= ~GPIO_CRH_MODE11;
+	  GPIOA->CRH	|= GPIO_CRH_MODE11_1;
+
+
+	  // Иницыализация таймера
+
+	  //делитель
+	  	TIM1->PSC = 72;
+	  	//значение перезагрузки
+	          TIM1->ARR = 1000;
+	  	//коэф. заполнения
+	  	TIM1->CCR4 = 300;
+	  	//настроим на выход канал 4, активный уровень низкий
+	  	TIM1->CCER |= TIM_CCER_CC4E | TIM_CCER_CC4P;
+	  	//разрешим использовать выводы таймера как выходы
+	  	TIM1->BDTR |= TIM_BDTR_MOE;
+	  	//PWM mode 1, прямой ШИМ 4 канал
+	           TIM1->CCMR2 = TIM_CCMR2_OC4M_2 | TIM_CCMR2_OC4M_1;
+	          //если надо настроить первый канал, это можно сделать так
+	          //TIM1->CCMR1 = TIM_CCMR1_OC1M_2 | TIM_CCMR1_OC1M_1;
+	  	//считаем вверх
+	  	TIM1->CR1 &= ~TIM_CR1_DIR;
+	  	//выравнивание по фронту, Fast PWM
+	  	TIM1->CR1 &= ~TIM_CR1_CMS;
+	  	//включаем счётчик
+	  	TIM1->CR1 |= TIM_CR1_CEN;
 }
 
 
@@ -70,8 +116,8 @@ void PortInit(void)
 
 int main(void)
 {
-   // ClockInit();
-   // PortInit();
+    // ClockInit();
+    PortInit();
 
     while(1){
 	GPIOC->ODR &=~ GPIO_ODR_ODR13;
