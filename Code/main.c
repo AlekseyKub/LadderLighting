@@ -17,7 +17,7 @@ void PortInit(void)
 
 	  // Тактирование  GPIOA , TIM1, альтернативных функций порта
 	  RCC->APB2ENR |= RCC_APB2ENR_IOPAEN | RCC_APB2ENR_TIM1EN | RCC_APB2ENR_AFIOEN;
-	  RCC->APB1ENR |= RCC_APB1ENR_TIM2EN |RCC_APB1ENR_TIM3EN;
+	  RCC->APB1ENR |= RCC_APB1ENR_TIM2EN |RCC_APB1ENR_TIM3EN |RCC_APB1ENR_TIM4EN;
 
 
 	  // Светодиод на плате
@@ -94,6 +94,26 @@ void PortInit(void)
 	  GPIOB->CRL &= ~GPIO_CRL_MODE1;
 	  GPIOB->CRL |= GPIO_CRL_MODE1_1;
 
+	  //настрока выводов TIM3
+	  GPIOB->CRL &= ~GPIO_CRL_CNF6;
+	  GPIOB->CRL |= GPIO_CRL_CNF6_1;
+	  GPIOB->CRL &= ~GPIO_CRL_MODE6;
+	  GPIOB->CRL |= GPIO_CRL_MODE6_1;
+
+	  GPIOB->CRL &= ~GPIO_CRL_CNF7;
+	  GPIOB->CRL |= GPIO_CRL_CNF7_1;
+	  GPIOB->CRL &= ~GPIO_CRL_MODE7;
+	  GPIOB->CRL |= GPIO_CRL_MODE7_1;
+
+	  GPIOB->CRH &= ~GPIO_CRH_CNF8;
+	  GPIOB->CRH |= GPIO_CRH_CNF8_1;
+	  GPIOB->CRH &= ~GPIO_CRH_MODE8;
+	  GPIOB->CRH |= GPIO_CRH_MODE8_1;
+
+	  GPIOB->CRH &= ~GPIO_CRH_CNF9;
+	  GPIOB->CRH |= GPIO_CRH_CNF9_1;
+	  GPIOB->CRH &= ~GPIO_CRH_MODE9;
+	  GPIOB->CRH |= GPIO_CRH_MODE9_1;
 
 
 	  // Иницыализация таймера TIM1
@@ -228,6 +248,49 @@ void PortInit(void)
 				 TIM3->CR1 |= TIM_CR1_CEN;
 
 
+				 // Иницыализацыи TIM4
+
+				  	TIM4->PSC = 72;
+				  	//значение перезагрузки
+				         TIM4->ARR = 1000;
+				  	//коэф. заполнения
+				  	TIM4->CCR4 = lite;
+				  	TIM4->CCR3 = 100;
+				  	TIM4->CCR2 = lite;
+				  	TIM4->CCR1 = lite;
+
+				  	//настроим на выход канал 4, активный уровень низкий
+				  	TIM4->CCER |= TIM_CCER_CC4E | TIM_CCER_CC4P;
+				  	TIM4->CCMR2 &= ~TIM_CCMR2_OC4PE;
+
+				  	TIM4->CCER |= TIM_CCER_CC3E | TIM_CCER_CC3P;
+				  	TIM4->CCMR2 &= ~TIM_CCMR2_OC3PE;
+
+				  	TIM4->CCER |= TIM_CCER_CC2E | TIM_CCER_CC2P;
+				  	TIM4->CCMR1 &= ~TIM_CCMR1_OC2PE;
+
+				  	TIM4->CCER |= TIM_CCER_CC1E | TIM_CCER_CC1P;
+				  	TIM4->CCMR1 &= ~TIM_CCMR1_OC1PE;
+
+				  	//разрешим использовать выводы таймера как выходы
+				  	TIM4->BDTR |= TIM_BDTR_MOE;
+
+				  	 //PWM mode 1, прямой ШИМ 4 канал
+				         TIM4->CCMR2 |= TIM_CCMR2_OC4M_2 | TIM_CCMR2_OC4M_1;
+				         TIM4->CCMR2 |= TIM_CCMR2_OC3M_2 | TIM_CCMR2_OC3M_1;
+				         TIM4->CCMR1 |= TIM_CCMR1_OC2M_2 | TIM_CCMR1_OC2M_1;
+				         TIM4->CCMR1 |= TIM_CCMR1_OC1M_2 | TIM_CCMR1_OC1M_1;
+
+				         //считаем вверх
+					 TIM4->CR1 &= ~TIM_CR1_DIR;
+					 //выравнивание по фронту, Fast PWM
+					 TIM4->CR1 &= ~TIM_CR1_CMS;
+
+					 TIM4->CR1 &= ~TIM_CR1_URS;
+					 //включаем счётчик
+					 TIM4->CR1 |= TIM_CR1_CEN;
+
+
 
 
 }
@@ -262,6 +325,10 @@ int main(void)
 	TIM3->CCR3 = 600;
 	TIM3->CCR2 = 600;
 	TIM3->CCR1 = 600;
+	TIM4->CCR4 = 600;
+	TIM4->CCR3 = 600;
+	TIM4->CCR2 = 600;
+	TIM4->CCR1 = 600;
 	GPIOC->ODR ^= GPIO_ODR_ODR13;
 
 	delay(100000);
@@ -278,6 +345,10 @@ int main(void)
 	TIM3->CCR3 = 800;
 	TIM3->CCR2 = 800;
 	TIM3->CCR1 = 800;
+	TIM4->CCR4 = 800;
+	TIM4->CCR3 = 800;
+	TIM4->CCR2 = 800;
+	TIM4->CCR1 = 800;
 
 	GPIOC->ODR ^= GPIO_ODR_ODR13;
 	delay(100000);
@@ -294,6 +365,10 @@ int main(void)
 	TIM3->CCR3 = 900;
 	TIM3->CCR2 = 900;
 	TIM3->CCR1 = 900;
+	TIM4->CCR4 = 900;
+	TIM4->CCR3 = 900;
+	TIM4->CCR2 = 900;
+	TIM4->CCR1 = 900;
 	GPIOC->ODR ^= GPIO_ODR_ODR13;
 	delay(100000);
 
@@ -309,6 +384,10 @@ int main(void)
 	TIM3->CCR3 = 100;
 	TIM3->CCR2 = 100;
 	TIM3->CCR1 = 100;
+	TIM4->CCR4 = 100;
+	TIM4->CCR3 = 100;
+	TIM4->CCR2 = 100;
+	TIM4->CCR1 = 100;
 	GPIOC->ODR ^= GPIO_ODR_ODR13;
 
 	delay(100000);
@@ -325,6 +404,10 @@ int main(void)
 	TIM3->CCR3 = 400;
 	TIM3->CCR2 = 400;
 	TIM3->CCR1 = 400;
+	TIM4->CCR4 = 400;
+	TIM4->CCR3 = 400;
+	TIM4->CCR2 = 400;
+	TIM4->CCR1 = 400;
 
     }
 return 0;
