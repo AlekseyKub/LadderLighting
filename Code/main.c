@@ -124,15 +124,27 @@ void PortInit(void)
 	  // Иницыализация таймера TIM1
 
 	  //делитель
-	  	TIM1->PSC = 500;
+	  	TIM1->PSC = 72;
 	  	//значение перезагрузки
-	         TIM1->ARR = 1000;
-	  	//коэф. заполнения
-	  	TIM1->CCR4 = lite;
-	  	TIM1->CCR3 = 100;
-	  	TIM1->CCR2 = lite;
-	  	TIM1->CCR1 = lite;
+	        TIM1->ARR = 100;
 
+	  	//коэф. заполнения
+		TIM1->ARR = 1000;
+		TIM1->EGR = TIM_EGR_UG;
+		TIM1->SR &= ~TIM_SR_UIF;        	// Сбрасываю флаг прерывания
+
+		TIM1->CR1 |= TIM_CR1_ARPE | TIM_CR1_CEN; // Разрешаю работу TIM1 и сброс при достижении максимальнго значения
+		//TIM1->DIER |= TIM_DIER_UIE;             // разрешаю прерывание по обновлению (достижению)
+
+		TIM1->CR1 &= ~TIM_CR1_DIR;              //считаем вверх
+
+		TIM1->CR1 |= TIM_CR1_CEN;		//включаем счётчик
+
+
+		NVIC_EnableIRQ(TIM1_UP_IRQn); 		 //Разрешаем обработку прерывания от таймера 2
+		NVIC_SetPriority(TIM1_UP_IRQn, 1); 	 //Приоритет прерывания
+
+/*
 	  	//настроим на выход канал 4, активный уровень низкий
 	  	TIM1->CCER |= TIM_CCER_CC4E | TIM_CCER_CC4P;
 	  	TIM1->CCMR2 &= ~TIM_CCMR2_OC4PE;
@@ -163,7 +175,7 @@ void PortInit(void)
 		 TIM1->CR1 &= ~TIM_CR1_URS;
 		 //включаем счётчик
 		 TIM1->CR1 |= TIM_CR1_CEN;
-
+*/
 
 		 // Иницыализацыи TIM2
 
@@ -306,6 +318,19 @@ void PortInit(void)
 
 }
 
+void TIM1_UP_IRQHandler(void){
+
+        if ((TIM1->SR & TIM_SR_UIF) != 0 )	// Если сработало прерывание по переполнению
+    	{
+        GPIOC->ODR ^= GPIO_ODR_ODR13;
+    	//FlagMessageReceived = 1;			// Устанавливаю флаг принятого сообщения (прошло 3.5 слова полле последнего принятого байта)
+
+    	//TIM1->DIER &=~ TIM_DIER_UIE;    	// Запрещаем прерывания по переполнению
+    	TIM1->SR &= ~TIM_SR_UIF;        	// Сбрасываю флаг прерывания
+    	//GPIOC->ODR ^= GPIO_ODR_ODR13;
+    	}
+}
+
 
 
 
@@ -321,13 +346,16 @@ int main(void)
 {
     ClockInit();
     PortInit();
+    GPIOC->ODR ^= GPIO_ODR_ODR13;
+
+    __enable_irq ();  // разрешить прерывания
 
     while(1){
 
 	if((GPIOB->IDR & (1<<15)) == 0){
 
 
-	GPIOC->ODR ^= GPIO_ODR_ODR13;
+	//GPIOC->ODR ^= GPIO_ODR_ODR13;
 
 	delay(100000);
 
@@ -347,7 +375,7 @@ int main(void)
 	TIM4->CCR3 = 600;
 	TIM4->CCR2 = 600;
 	TIM4->CCR1 = 600;
-	GPIOC->ODR ^= GPIO_ODR_ODR13;
+	//GPIOC->ODR ^= GPIO_ODR_ODR13;
 
 	delay(100000);
 
@@ -368,7 +396,7 @@ int main(void)
 	TIM4->CCR2 = 800;
 	TIM4->CCR1 = 800;
 
-	GPIOC->ODR ^= GPIO_ODR_ODR13;
+	//GPIOC->ODR ^= GPIO_ODR_ODR13;
 	delay(100000);
 
 	TIM1->CCR4 = 800;
@@ -387,7 +415,7 @@ int main(void)
 	TIM4->CCR3 = 900;
 	TIM4->CCR2 = 900;
 	TIM4->CCR1 = 900;
-	GPIOC->ODR ^= GPIO_ODR_ODR13;
+	//GPIOC->ODR ^= GPIO_ODR_ODR13;
 	delay(100000);
 
 	TIM1->CCR4 = 950;
@@ -406,7 +434,7 @@ int main(void)
 	TIM4->CCR3 = 100;
 	TIM4->CCR2 = 100;
 	TIM4->CCR1 = 100;
-	GPIOC->ODR ^= GPIO_ODR_ODR13;
+	//GPIOC->ODR ^= GPIO_ODR_ODR13;
 
 	delay(100000);
 
