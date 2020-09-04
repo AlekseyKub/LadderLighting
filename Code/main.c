@@ -1,8 +1,13 @@
 #include "main.h"
 #include "stm32f1xx.h"
 #include "stm32f103xb.h"
+#include "RCCinit.h"
+
+#define SPEELITE 10
 
 int lite=500;
+
+
 
 //Настройка портов
 void PortInit(void)
@@ -94,7 +99,7 @@ void PortInit(void)
 	  GPIOB->CRL &= ~GPIO_CRL_MODE1;
 	  GPIOB->CRL |= GPIO_CRL_MODE1_1;
 
-	  //настрока выводов TIM3
+	  //настрока выводов TIM4
 	  GPIOB->CRL &= ~GPIO_CRL_CNF6;
 	  GPIOB->CRL |= GPIO_CRL_CNF6_1;
 	  GPIOB->CRL &= ~GPIO_CRL_MODE6;
@@ -119,7 +124,7 @@ void PortInit(void)
 	  // Иницыализация таймера TIM1
 
 	  //делитель
-	  	TIM1->PSC = 72;
+	  	TIM1->PSC = 500;
 	  	//значение перезагрузки
 	         TIM1->ARR = 1000;
 	  	//коэф. заполнения
@@ -292,8 +297,17 @@ void PortInit(void)
 
 
 
+					 GPIOB->CRH &= ~(GPIO_CRH_MODE15 | GPIO_CRH_CNF15);
+					 //MODE: вход, оставляем в нуле
+					 //CNF: вход с pull-up / pull-down
+					 GPIOB->CRH |= (0x00 << GPIO_CRH_MODE15_Pos) | (0x02 << GPIO_CRH_CNF15_Pos);
+					 GPIOB->ODR |= (1<<15); //Включаем подтяжку вверх
+
 
 }
+
+
+
 
 void delay(uint32_t time_delay)
 		{
@@ -305,10 +319,14 @@ void delay(uint32_t time_delay)
 
 int main(void)
 {
-
+    ClockInit();
     PortInit();
 
     while(1){
+
+	if((GPIOB->IDR & (1<<15)) == 0){
+
+
 	GPIOC->ODR ^= GPIO_ODR_ODR13;
 
 	delay(100000);
@@ -408,7 +426,26 @@ int main(void)
 	TIM4->CCR3 = 400;
 	TIM4->CCR2 = 400;
 	TIM4->CCR1 = 400;
+	}
+	else {
+	    TIM1->CCR4 = 1000;
+	    TIM1->CCR3 = 1000;
+	    TIM1->CCR2 = 1000;
+	    TIM1->CCR1 = 1000;
+	    TIM2->CCR4 = 1000;
+	    TIM2->CCR3 = 1000;
+	    TIM2->CCR2 = 1000;
+	    TIM2->CCR1 = 1000;
+	    TIM3->CCR4 = 1000;
+	    TIM3->CCR3 = 1000;
+	    TIM3->CCR2 = 1000;
+	    TIM3->CCR1 = 1000;
+	    TIM4->CCR4 = 1000;
+	    TIM4->CCR3 = 1000;
+	    TIM4->CCR2 = 1000;
+	    TIM4->CCR1 = 1000;
 
+	}
     }
 return 0;
 }
