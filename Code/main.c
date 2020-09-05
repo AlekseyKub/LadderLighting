@@ -4,6 +4,7 @@
 #include "RCCinit.h"
 
 #define SPEELITE 10
+#define SPEE 10
 
 int lite=500;
 
