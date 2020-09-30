@@ -5,18 +5,19 @@
 #include "TimerInit.h"
 
 
-char DownOn = 0;
-char UpON = 0;
-char Resetlite = 0;
+char DownOn = 0;    	// флаг нижнего датчика
+char UpOn = 0;		// флаг верхнего датчика
+char Resetlite = 0;	// Флаг обновления яркости ступенек
 
-char Status = 0;
-int SpeedLite = 10;         // Скорость зажигания
+char Status = 0;		// статус работы контроллера  0-ожидание саботки 1-сраб. ниж. дат. 2-сраб. вехн. дат. 3-сработали оба датчика 4-задержка на выключение
+				// 5-выключение вверх 6-выключение вниз 7-выключение одновременно
+int SpeedLite = 10;        	// Скорость зажигания
 int SmoothnessLite = 900;	// Плавность зажигания
-int Step = 6;				// Количество ступенек
-int MaxLite = 1000;			// Максимальная яркость
+int Step = 12;			// Количество ступенек
+int MaxLite = 1000;		// Максимальная яркость
 int MaxLiteDuti = 200;		// Дежурная яркость
 
-int StepValue[12];			// Ххранение значения яркости ступенек
+int StepValue[12];		// Хранение значения яркости ступенек
 
 //Настройка портов
 void PortInit(void)
@@ -146,40 +147,76 @@ void TIM1_UP_IRQHandler(void){
         GPIOC->ODR ^= GPIO_ODR_ODR13;
     	TIM1->CNT = 0;
 
-    	if (DownOn == 1){
+    	if (DownOn == 1){			// Если сработал нижний датчик, переводим контроллер в режим 1
+    	    Status = 1;
+    	}
+
+    	if (UpOn == 1){				// Если сработал верний датчик, переводим контроллер в режим 2
+    	    Status = 2;
+    	}
+
+    	if ((DownOn == 1) && (UpOn == 1)){	// Если сработали два датчика переводим в режим 3
+    	    Status = 3;
+    	}
+
+    	if ((Status == 1) || (Status == 3)){	// Если сработал нижний или оба датчика, запускае функцию включения ступенек вверх
     		StepSetDown();
+    	}
+
+    	if ((Status == 2) || (Status == 3)){	// Если сработал верхний или оба датчика, запускае функцию включения ступенек вниз
+    		StepSetUp();
     	}
 
     	TIM1->SR &= ~TIM_SR_UIF;        	// Сбрасываю флаг прерывания
 }
 
-// Функция Включения ступенек
+// Функция Включения ступенек снизу вверх
 void StepSetDown(void){
-	Status = 1;
-	int x = 0;
-	if (SV(x) <= MaxLite){
-	SV(x) += SpeedLite;
+	//Status = 1;
+	int x = 0;		// переменная подсчета ступенек вверх
+
+	if (SV(x) <= MaxLite){	// если первая ступенька еще не доконца включилась увеличиваем яркость
+	    SV(x) += SpeedLite;
 	}
-	for (x = 1 ; x <=Step ; x++ ){
-		if ((SV(x-1) >= SmoothnessLite) && (SV(x) < MaxLite)){
+
+	for (x = 1 ; x <=Step ; x++ ){						// проходимся по всем ступенькам для зажигания следующей не дожидаясь максимума предыдущей
+		if ((SV(x-1) >= SmoothnessLite) && (SV(x) < MaxLite)){     	// (условие выполнится только для одной ступеньки)
 			SV(x) += SpeedLite;
 		}
-	if (SV(Step) == 1000){
-		DownOn = 0;
+	if ((SV(Step) == 1000) && (SV(0) == 1000)){	// если верхняя и нижняя ступеньки достигли максисума (нижнюю проверяем если одновременно идет включение в обратном направлении
+		DownOn = 0;				// обнуляем статус датчика
 		Status = 2;
 	}
-
 	Resetlite = 1;
 	}
+}
 
+// Функция включения ступенек сверху вниз
+void StepSetUp(void){
+    //Status = 1;
+    int y = Step;
+
+    if (SV(y) <= MaxLite){
+	SV(y) += SpeedLite;
+    }
+
+    for (y = Step ; y >= 0 ; y-- ){			// проходимся по всем ступенькам для зажигания следующей не дожидаясь максимума предыдущей
+    		if ((SV(y + 1) >= SmoothnessLite) && (SV(y) < MaxLite)){     // (условие выполнится только для одной ступеньки)
+    			SV(y) += SpeedLite;
+    		}
+
+    if ((SV(Step) == 1000) && (SV(y) == 1000)){
+    	UpOn = 0;
+    	Status = 2;
+    }
+    Resetlite = 1;
+    }
 }
 
 // Функция гашения ступенек
 void StepDark(void){
 
 }
-
-
 
 int main(void)
 {
@@ -209,111 +246,7 @@ int main(void)
 
 	if(GPIOB->IDR & (1<<15)){
 		DownOn = 1;
-
-/*
-	//GPIOC->ODR ^= GPIO_ODR_ODR13;
-
-	delay(100000);
-
-
-	TIM2->CCR4 = 600;
-	TIM2->CCR3 = 600;
-	TIM2->CCR2 = 600;
-	TIM2->CCR1 = 600;
-	TIM3->CCR4 = 600;
-	TIM3->CCR3 = 600;
-	TIM3->CCR2 = 600;
-	TIM3->CCR1 = 600;
-	TIM4->CCR4 = 600;
-	TIM4->CCR3 = 600;
-	TIM4->CCR2 = 600;
-	TIM4->CCR1 = 600;
-	//GPIOC->ODR ^= GPIO_ODR_ODR13;
-
-	delay(100000);
-
-
-	TIM2->CCR4 = 800;
-	TIM2->CCR3 = 800;
-	TIM2->CCR2 = 800;
-	TIM2->CCR1 = 800;
-	TIM3->CCR4 = 800;
-	TIM3->CCR3 = 800;
-	TIM3->CCR2 = 800;
-	TIM3->CCR1 = 800;
-	TIM4->CCR4 = 800;
-	TIM4->CCR3 = 800;
-	TIM4->CCR2 = 800;
-	TIM4->CCR1 = 800;
-
-	//GPIOC->ODR ^= GPIO_ODR_ODR13;
-	delay(100000);
-
-
-	TIM2->CCR4 = 900;
-	TIM2->CCR3 = 900;
-	TIM2->CCR2 = 900;
-	TIM2->CCR1 = 900;
-	TIM3->CCR4 = 900;
-	TIM3->CCR3 = 900;
-	TIM3->CCR2 = 900;
-	TIM3->CCR1 = 900;
-	TIM4->CCR4 = 900;
-	TIM4->CCR3 = 900;
-	TIM4->CCR2 = 900;
-	TIM4->CCR1 = 900;
-	//GPIOC->ODR ^= GPIO_ODR_ODR13;
-	delay(100000);
-
-
-	TIM2->CCR4 = 100;
-	TIM2->CCR3 = 100;
-	TIM2->CCR2 = 100;
-	TIM2->CCR1 = 100;
-	TIM3->CCR4 = 100;
-	TIM3->CCR3 = 100;
-	TIM3->CCR2 = 100;
-	TIM3->CCR1 = 100;
-	TIM4->CCR4 = 100;
-	TIM4->CCR3 = 100;
-	TIM4->CCR2 = 100;
-	TIM4->CCR1 = 100;
-	//GPIOC->ODR ^= GPIO_ODR_ODR13;
-
-	delay(100000);
-
-
-	TIM2->CCR4 = 400;
-	TIM2->CCR3 = 400;
-	TIM2->CCR2 = 400;
-	TIM2->CCR1 = 400;
-	TIM3->CCR4 = 400;
-	TIM3->CCR3 = 400;
-	TIM3->CCR2 = 400;
-	TIM3->CCR1 = 400;
-	TIM4->CCR4 = 400;
-	TIM4->CCR3 = 400;
-	TIM4->CCR2 = 400;
-	TIM4->CCR1 = 400;
 	}
-	else {
-
-	    TIM2->CCR4 = 1000;
-	    TIM2->CCR3 = 1000;
-	    TIM2->CCR2 = 1000;
-	    TIM2->CCR1 = 1000;
-	    TIM3->CCR4 = 1000;
-	    TIM3->CCR3 = 1000;
-	    TIM3->CCR2 = 1000;
-	    TIM3->CCR1 = 1000;
-	    TIM4->CCR4 = 1000;
-	    TIM4->CCR3 = 1000;
-	    TIM4->CCR2 = 1000;
-	    TIM4->CCR1 = 1000;
-
-	}
-	*/
-    }
 
 	if (Resetlite == 1){
 		OUT1 = SV(1);

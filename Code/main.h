@@ -31,6 +31,7 @@
 */
 
 void StepSetDown(void);
+void StepSetUp(void);
 
 void delay(uint32_t time_delay)
 		{
