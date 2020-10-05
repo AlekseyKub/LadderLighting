@@ -167,6 +167,10 @@ void TIM1_UP_IRQHandler(void){
     		StepSetUp();
     	}
 
+    	if ((Status == 4) || (Status == 5) || (Status == 6)){
+
+    	}
+
     	TIM1->SR &= ~TIM_SR_UIF;        	// —брасываю флаг прерывани€
 }
 
@@ -184,8 +188,14 @@ void StepSetDown(void){
 			SV(x) += SpeedLite;
 		}
 	if ((SV(Step) == 1000) && (SV(0) == 1000)){	// если верхн€€ и нижн€€ ступеньки достигли максисума (нижнюю провер€ем если одновременно идет включение в обратном направлении
-		DownOn = 0;				// обнул€ем статус датчика
-		Status = 2;
+		DownOn = 0;                             // обнул€ем статус датчика
+		if (Status == 1){
+		    Status = 4;
+		}
+
+		if (Status == 3){
+		Status = 6;
+		}
 	}
 	Resetlite = 1;
 	}
@@ -207,7 +217,13 @@ void StepSetUp(void){
 
     if ((SV(Step) == 1000) && (SV(y) == 1000)){
     	UpOn = 0;
-    	Status = 2;
+    	if (Status == 2){
+    	    Status = 5;
+    	}
+
+    	if (Status == 3){
+    	    Status = 6;
+    	}
     }
     Resetlite = 1;
     }
