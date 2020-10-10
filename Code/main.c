@@ -130,7 +130,7 @@ void PortInit(void)
 	  GPIOB->CRH &= ~GPIO_CRH_MODE9;
 	  GPIOB->CRH |= GPIO_CRH_MODE9_1;
 
-
+/*
 	   GPIOB->CRH &= ~(GPIO_CRH_MODE15 | GPIO_CRH_CNF15);
 	   //MODE: вход, оставл€ем в нуле
 	   //CNF: вход с pull-up / pull-down
@@ -140,6 +140,18 @@ void PortInit(void)
 	   GPIOB->CRH &= ~(GPIO_CRH_MODE14 | GPIO_CRH_CNF14);
 	   GPIOB->CRH |= (0x00 << GPIO_CRH_MODE14_Pos) | (0x02 << GPIO_CRH_CNF14_Pos);
 	   GPIOB->ODR |= (1<<14);
+*/
+	   GPIOB->CRL &= ~(GPIO_CRL_MODE5 | GPIO_CRL_CNF5);
+	   //MODE: вход, оставл€ем в нуле
+	   //CNF: вход с pull-up / pull-down
+	   GPIOB->CRL |= (0x00 << GPIO_CRL_MODE5_Pos) | (0x02 << GPIO_CRL_CNF5_Pos);
+	   GPIOB->ODR |= (1<<5); //¬ключаем подт€жку вверх
+
+	   GPIOB->CRL &= ~(GPIO_CRL_MODE4 | GPIO_CRL_CNF4);
+	   //MODE: вход, оставл€ем в нуле
+	   //CNF: вход с pull-up / pull-down
+	   GPIOB->CRL |= (0x00 << GPIO_CRL_MODE4_Pos) | (0x02 << GPIO_CRL_CNF4_Pos);
+	   GPIOB->ODR |= (1<<4); //¬ключаем подт€жку вверх
 
 }
 
@@ -187,7 +199,7 @@ void StepSetDown(void){
 		if ((SV(x-1) >= SmoothnessLite) && (SV(x) < MaxLite)){     	// (условие выполнитс€ только дл€ одной ступеньки)
 			SV(x) += SpeedLite;
 		}
-	if ((SV(Step) == 1000) && (SV(0) == 1000)){	// если верхн€€ и нижн€€ ступеньки достигли максисума (нижнюю провер€ем если одновременно идет включение в обратном направлении
+	if ((SV(Step) == 1000)){	// если верхн€€ и нижн€€ ступеньки достигли максисума (нижнюю провер€ем если одновременно идет включение в обратном направлении
 		DownOn = 0;                             // обнул€ем статус датчика
 		if (Status == 1){
 		    Status = 4;
@@ -215,7 +227,7 @@ void StepSetUp(void){
     			SV(y) += SpeedLite;
     		}
 
-    if ((SV(Step) == 1000) && (SV(y) == 1000)){
+    if ((SV(1) == 1000)){
     	UpOn = 0;
     	if (Status == 2){
     	    Status = 5;
@@ -260,9 +272,13 @@ int main(void)
 
     while(1){
 
-	if(GPIOB->IDR & (1<<15)){
+	if(GPIOB->IDR & (1<<5)){
 		DownOn = 1;
 	}
+
+	if(GPIOB->IDR & (1<<4)){
+		UpOn = 1 ;
+		}
 
 	if (Resetlite == 1){
 		OUT1 = SV(1);
@@ -280,7 +296,7 @@ int main(void)
 		Resetlite = 0;
 	}
 
-	if (Status == 2){
+	if ((Status == 4) || (Status == 5) || (Status == 6)) {
 		SV(1) = MaxLiteDuti;
 		SV(2) = 0;
 		SV(3) = 0;
