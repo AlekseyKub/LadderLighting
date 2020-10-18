@@ -8,14 +8,18 @@
 char DownOn = 0;    	// флаг нижнего датчика
 char UpOn = 0;		// флаг верхнего датчика
 char Resetlite = 0;	// Флаг обновления яркости ступенек
+char AllLiteOn = 0;   // Флаг включения всех ступенек
 
+int DelayOff = 0;	// Переменная для отсчета задержек
+
+char OffStatus = 0; 	// Статус как выключать ступеньки
 char Status = 0;		// статус работы контроллера  0-ожидание саботки 1-сраб. ниж. дат. 2-сраб. вехн. дат. 3-сработали оба датчика 4-задержка на выключение
 				// 5-выключение вверх 6-выключение вниз 7-выключение одновременно
 int SpeedLite = 10;        	// Скорость зажигания
-int SmoothnessLite = 900;	// Плавность зажигания
+int SmoothnessLite = 200;	// Плавность зажигания
 int Step = 12;			// Количество ступенек
-int MaxLite = 1000;		// Максимальная яркость
-int MaxLiteDuti = 200;		// Дежурная яркость
+int MaxLite = 300;		// Максимальная яркость
+int MaxLiteDuti = 50;		// Дежурная яркость
 
 int StepValue[12];		// Хранение значения яркости ступенек
 
@@ -155,32 +159,62 @@ void PortInit(void)
 
 }
 
+// перевод ступенек в дежурный режим
+void StandbyMode (void){
+	int a = 1;
+	while (a <= 12){
+		SV(a) = 0;
+		a++;
+	}
+
+	SV(1) = MaxLiteDuti;
+	SV(Step) = MaxLiteDuti;
+	Resetlite = 1;
+}
+
+// проверка на включение всех ступенек
+void AllLite(void){
+	if (SV(5) == 100){
+		Status = 4;
+		DownOn = 0;
+		UpOn = 0;
+	}
+}
+
 void TIM1_UP_IRQHandler(void){
-        GPIOC->ODR ^= GPIO_ODR_ODR13;
+        //GPIOC->ODR ^= GPIO_ODR_ODR13;
     	TIM1->CNT = 0;
 
-    	if (DownOn == 1){			// Если сработал нижний датчик, переводим контроллер в режим 1
-    	    Status = 1;
-    	}
+    	switch (Status){
 
-    	if (UpOn == 1){				// Если сработал верний датчик, переводим контроллер в режим 2
-    	    Status = 2;
-    	}
-
-    	if ((DownOn == 1) && (UpOn == 1)){	// Если сработали два датчика переводим в режим 3
-    	    Status = 3;
-    	}
-
-    	if ((Status == 1) || (Status == 3)){	// Если сработал нижний или оба датчика, запускае функцию включения ступенек вверх
+    	case 1:
     		StepSetDown();
-    	}
+    		AllLite();
+    		break;
 
-    	if ((Status == 2) || (Status == 3)){	// Если сработал верхний или оба датчика, запускае функцию включения ступенек вниз
+    	case 2:
     		StepSetUp();
-    	}
+    		AllLite();
+    		break;
 
-    	if ((Status == 4) || (Status == 5) || (Status == 6)){
+    	case 3:
+    		StepSetDown();
+    		StepSetUp();
+    		AllLite();
+    		break;
 
+    	case 4:// десь надо сделатьь задержку
+    		StandbyMode();
+    		GPIOC->ODR |= GPIO_ODR_ODR13;
+
+    		break;
+
+    	case 5:
+    		break;
+    	case 6:
+    		break;
+    	case 7:
+    		break;
     	}
 
     	TIM1->SR &= ~TIM_SR_UIF;        	// Сбрасываю флаг прерывания
@@ -188,8 +222,8 @@ void TIM1_UP_IRQHandler(void){
 
 // Функция Включения ступенек снизу вверх
 void StepSetDown(void){
-	//Status = 1;
-	int x = 0;		// переменная подсчета ступенек вверх
+	if ((Status == 1) || (Status == 3)){
+	int x = 1;		// переменная подсчета ступенек вверх
 
 	if (SV(x) <= MaxLite){	// если первая ступенька еще не доконца включилась увеличиваем яркость
 	    SV(x) += SpeedLite;
@@ -199,23 +233,16 @@ void StepSetDown(void){
 		if ((SV(x-1) >= SmoothnessLite) && (SV(x) < MaxLite)){     	// (условие выполнится только для одной ступеньки)
 			SV(x) += SpeedLite;
 		}
-	if ((SV(Step) == 1000)){	// если верхняя и нижняя ступеньки достигли максисума (нижнюю проверяем если одновременно идет включение в обратном направлении
-		DownOn = 0;                             // обнуляем статус датчика
-		if (Status == 1){
-		    Status = 4;
-		}
+	}
 
-		if (Status == 3){
-		Status = 6;
-		}
 	}
 	Resetlite = 1;
-	}
+
 }
 
 // Функция включения ступенек сверху вниз
 void StepSetUp(void){
-    //Status = 1;
+    if((Status == 2) || (Status == 3)){
     int y = Step;
 
     if (SV(y) <= MaxLite){
@@ -226,25 +253,12 @@ void StepSetUp(void){
     		if ((SV(y + 1) >= SmoothnessLite) && (SV(y) < MaxLite)){     // (условие выполнится только для одной ступеньки)
     			SV(y) += SpeedLite;
     		}
-
-    if ((SV(1) == 1000)){
-    	UpOn = 0;
-    	if (Status == 2){
-    	    Status = 5;
-    	}
-
-    	if (Status == 3){
-    	    Status = 6;
-    	}
     }
     Resetlite = 1;
     }
 }
 
-// Функция гашения ступенек
-void StepDark(void){
 
-}
 
 int main(void)
 {
@@ -253,34 +267,14 @@ int main(void)
     TimerInit();
     GPIOC->ODR ^= GPIO_ODR_ODR13;
 
-    SV(1) = MaxLiteDuti;
-    SV(2) = 0;
-    SV(3) = 0;
-    SV(4) = 0;
-    SV(5) = 0;
-    SV(6) = 0;
-    SV(7) = 0;
-    SV(8) = 0;
-    SV(9) = 0;
-    SV(10) = 0;
-    SV(11) = 0;
-    SV(12) = MaxLiteDuti;
 
+    StandbyMode();
     Resetlite = 1;
-
     __enable_irq ();  // разрешить прерывания if((GPIOB->IDR & (1<<15)) == 1)
 
     while(1){
 
-	if(GPIOB->IDR & (1<<5)){
-		DownOn = 1;
-	}
-
-	if(GPIOB->IDR & (1<<4)){
-		UpOn = 1 ;
-		}
-
-	if (Resetlite == 1){
+    	if (Resetlite == 1){
 		OUT1 = SV(1);
 		OUT2 = SV(2);
 		OUT3 = SV(3);
@@ -296,24 +290,39 @@ int main(void)
 		Resetlite = 0;
 	}
 
-	if ((Status == 4) || (Status == 5) || (Status == 6)) {
-		SV(1) = MaxLiteDuti;
-		SV(2) = 0;
-		SV(3) = 0;
-		SV(4) = 0;
-		SV(5) = 0;
-		SV(6) = 0;
-		SV(7) = 0;
-		SV(8) = 0;
-		SV(9) = 0;
-		SV(10) = 0;
-		SV(11) = 0;
-		SV(12) = MaxLiteDuti;
 
-		Resetlite = 1;
 
-		Status = 0;
+    	if(GPIOB->IDR & (1<<5)){
+    		DownOn = 1;
+    		}
+
+
+    	if(GPIOB->IDR & (1<<4)){
+    		UpOn = 1 ;
+    		}
+
+
+    if (DownOn == 1){			// Если сработал нижний датчик, переводим контроллер в режим 1
+	    if (Status != 4){
+    	Status = 1;
 	}
+    }
+
+	if (UpOn == 1){				// Если сработал верний датчик, переводим контроллер в режим 2
+	    if (Status != 4){
+		Status = 2;
+	}
+	}
+
+	if ((DownOn == 1) && (UpOn == 1)){	// Если сработали два датчика переводим в режим 3
+	    if (Status != 4){
+		Status = 3;
+	}
+	}
+
+
+
     }
 return 0;
 }
+
