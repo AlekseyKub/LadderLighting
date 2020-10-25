@@ -8,20 +8,26 @@
 char DownOn = 0;    	// флаг нижнего датчика
 char UpOn = 0;		// флаг верхнего датчика
 char Resetlite = 0;	// Флаг обновления яркости ступенек
-char AllLiteOn = 0;   // Флаг включения всех ступенек
 
-int DelayOff = 0;	// Переменная для отсчета задержек
 
-char OffStatus = 0; 	// Статус как выключать ступеньки
+int DelayOff = 0;			// Переменная для отсчета задержек
+int DelayVal = 1000;  		// До скольки считаем задержку
+int DelayDark = 300;		// Зедержка если зафиксирован проход
+int DelayStorage = 1000;	// Задержка если не будет совершен проход или будут повторные проходы
+
+
 char Status = 0;		// статус работы контроллера  0-ожидание саботки 1-сраб. ниж. дат. 2-сраб. вехн. дат. 3-сработали оба датчика 4-задержка на выключение
 				// 5-выключение вверх 6-выключение вниз 7-выключение одновременно
-int SpeedLite = 10;        	// Скорость зажигания
-int SmoothnessLite = 200;	// Плавность зажигания
+char StatusDark = 0;  // 1-выключение после нижнего датчика; 2-выключение после верхнего датчика; 3- выключение после верхнего и нижнего датчиков
+
+int SpeedLite = 9;        	// Скорость зажигания
+int SmoothnessLite = 500;	// Плавность зажигания
 int Step = 12;			// Количество ступенек
-int MaxLite = 300;		// Максимальная яркость
+int StepDark = 0;  // Половина ступенек (необходима для отключения в обе стороны)
+int MaxLite = 1000;		// Максимальная яркость
 int MaxLiteDuti = 50;		// Дежурная яркость
 
-int StepValue[12];		// Хранение значения яркости ступенек
+int StepValue[15];		// Хранение значения яркости ступенек
 
 //Настройка портов
 void PortInit(void)
@@ -174,13 +180,41 @@ void StandbyMode (void){
 
 // проверка на включение всех ступенек
 void AllLite(void){
-	if (SV(5) == 100){
-		Status = 4;
-		DownOn = 0;
-		UpOn = 0;
+
+	int z = 1;
+	while (SV(z) == MaxLite)
+	{
+		z++;
+		if (z == (Step + 1))
+		{
+			if (Status == 1)
+			{
+				StatusDark = 1;
+			}
+			if (Status == 2)
+			{
+				StatusDark = 2;
+			}
+			if (Status == 3)
+			{
+				StatusDark = 3;
+			}
+
+			Status = 4;
+			DownOn = 0;
+			UpOn = 0;
+		}
 	}
 }
 
+void AllLiteOff(void)
+{
+	if ((SV(1) == MaxLiteDuti) && (SV(Step) == MaxLiteDuti))
+	{
+		Status = 0;
+		StatusDark = 0;
+	}
+}
 void TIM1_UP_IRQHandler(void){
         //GPIOC->ODR ^= GPIO_ODR_ODR13;
     	TIM1->CNT = 0;
@@ -204,17 +238,21 @@ void TIM1_UP_IRQHandler(void){
     		break;
 
     	case 4:// десь надо сделатьь задержку
-    		StandbyMode();
-    		GPIOC->ODR |= GPIO_ODR_ODR13;
-
+    		DelayOff++;
+    		if (DelayOff >= DelayVal)
+    		{
+    			DelayOff = 0;
+    			DelayVal = DelayStorage;
+    			//StandbyMode();
+    			Status = 5;
+    		}
     		break;
 
     	case 5:
+    		StepSetDark();
+    		AllLiteOff();
     		break;
-    	case 6:
-    		break;
-    	case 7:
-    		break;
+
     	}
 
     	TIM1->SR &= ~TIM_SR_UIF;        	// Сбрасываю флаг прерывания
@@ -227,11 +265,19 @@ void StepSetDown(void){
 
 	if (SV(x) <= MaxLite){	// если первая ступенька еще не доконца включилась увеличиваем яркость
 	    SV(x) += SpeedLite;
+	    if (SV(x) > MaxLite)
+	    {
+	    	SV(x) = MaxLite;
+	    }
 	}
 
-	for (x = 1 ; x <=Step ; x++ ){						// проходимся по всем ступенькам для зажигания следующей не дожидаясь максимума предыдущей
+	for (x = 2 ; x <=Step ; x++ ){						// проходимся по всем ступенькам для зажигания следующей не дожидаясь максимума предыдущей
 		if ((SV(x-1) >= SmoothnessLite) && (SV(x) < MaxLite)){     	// (условие выполнится только для одной ступеньки)
 			SV(x) += SpeedLite;
+			if (SV(x) > MaxLite)
+				{
+				SV(x) = MaxLite;
+				}
 		}
 	}
 
@@ -245,13 +291,22 @@ void StepSetUp(void){
     if((Status == 2) || (Status == 3)){
     int y = Step;
 
-    if (SV(y) <= MaxLite){
+    if (SV(y) <= MaxLite)
+    {
 	SV(y) += SpeedLite;
+	if (SV(y) > MaxLite)
+	{
+	SV(y) = MaxLite;
+	}
     }
 
     for (y = Step ; y >= 0 ; y-- ){			// проходимся по всем ступенькам для зажигания следующей не дожидаясь максимума предыдущей
     		if ((SV(y + 1) >= SmoothnessLite) && (SV(y) < MaxLite)){     // (условие выполнится только для одной ступеньки)
     			SV(y) += SpeedLite;
+    			if (SV(y) > MaxLite)
+    		    {
+    		    	SV(y) = MaxLite;
+    		    }
     		}
     }
     Resetlite = 1;
@@ -259,6 +314,147 @@ void StepSetUp(void){
 }
 
 
+void StepSetDark (void) // функция выключения ступенек.
+{
+	int r = 1;
+	int t = Step;
+
+	if (StatusDark == 1)
+	{
+
+
+		if (SV(r) > MaxLiteDuti)
+		{
+			SV(r) -= SpeedLite;
+
+			if (SV(r) < MaxLiteDuti)
+			{
+				SV(r) = MaxLiteDuti;
+			}
+		}
+		for (r = 2; r < Step; r++)
+		{
+			if ((SV(r-1) <= SmoothnessLite) && (SV(r) > 0))
+			{
+				SV(r) -= SpeedLite;
+				if (SV(r) < 0)
+				{
+					SV(r) = 0;
+				}
+			}
+		}
+		if ((SV(Step - 1) <= SmoothnessLite) && (SV(Step) > MaxLiteDuti))
+		{
+			SV(Step) -= SpeedLite;
+			if (SV(Step) < MaxLiteDuti)
+			{
+				SV(Step) = MaxLiteDuti;
+			}
+		}
+		Resetlite = 1;
+	}
+
+	if (StatusDark == 2)
+	{
+		if (SV(t) > MaxLiteDuti)
+		{
+			SV(t) -= SpeedLite;
+			if (SV(t) < MaxLiteDuti)
+			{
+				SV(t) = MaxLiteDuti;
+			}
+		}
+
+		for (t = (Step - 1); t >= 2; t--)
+		{
+			if ((SV(t+1) <= SmoothnessLite) && (SV(t) > 0))
+			{
+				SV(t) -= SpeedLite;
+				if (SV(t) < 0)
+				{
+					SV(t) = 0;
+				}
+			}
+		}
+
+		if ((SV(2) <= SmoothnessLite) && (SV(1) > MaxLiteDuti))
+		{
+			SV(1) -= SpeedLite;
+			if (SV(1) < MaxLiteDuti)
+			{
+				SV(1) = MaxLiteDuti;
+			}
+		}
+		Resetlite = 1;
+	}
+
+	if (StatusDark == 3)
+	{
+		r = StepDark + 1;
+		t = StepDark;
+
+		if (SV(r) > 0)
+		{
+			SV(r) -= SpeedLite;
+			if (SV(r) < 0)
+			{
+				SV(r) = 0;
+			}
+		}
+		r++;
+		for (r = (StepDark + 2); r < Step; r++)
+		{
+			if ((SV(r-1) <= SmoothnessLite) && (SV(r) > 0))
+			{
+				SV(r) -= SpeedLite;
+				if (SV(r) < 0)
+				{
+					SV(r) = 0;
+				}
+			}
+		}
+		if ((SV(Step - 1) <= SmoothnessLite) && (SV(Step) > MaxLiteDuti))
+		{
+			SV(Step) -= SpeedLite;
+			if (SV(Step) < MaxLiteDuti)
+			{
+				SV(Step) = MaxLiteDuti;
+			}
+		}
+
+		if (SV(t) > 0)
+		{
+			SV(t) -=SpeedLite;
+			if (SV(t) < 0)
+			{
+				SV(t) = 0;
+			}
+		}
+		t--;
+
+		for (t = (StepDark - 1); t >=2 ; t--)
+		{
+			if ((SV(t+1) <= SmoothnessLite) && (SV(t) > 0))
+			{
+				SV(t) -= SpeedLite;
+				if (SV(t) < 0)
+				{
+					SV(t) = 0;
+				}
+			}
+
+		}
+		if ((SV(2) <= SmoothnessLite) && (SV(1) > MaxLiteDuti))
+		{
+			SV(1) -= SpeedLite;
+			if (SV(1) < MaxLiteDuti)
+			{
+				SV(1) = MaxLiteDuti;
+			}
+		}
+		Resetlite = 1;
+	}
+}
 
 int main(void)
 {
@@ -267,6 +463,7 @@ int main(void)
     TimerInit();
     GPIOC->ODR ^= GPIO_ODR_ODR13;
 
+    StepDark = (Step / 2);
 
     StandbyMode();
     Resetlite = 1;
@@ -303,25 +500,62 @@ int main(void)
 
 
     if (DownOn == 1){			// Если сработал нижний датчик, переводим контроллер в режим 1
-	    if (Status != 4){
-    	Status = 1;
-	}
+	    if (Status == 0)
+	    {
+	    	Status = 1;
+	    }
+	    if (Status == 2)
+	    {
+	    	Status = 3;
+	    }
+	    if (Status == 4)
+	    {
+	    	if (StatusDark == 2)
+	    	{
+	    		DelayOff = 0;
+	    		DelayVal = DelayDark;
+	    		DownOn = 0;
+	    	}
+	    	else
+	    	{
+	    		DelayOff = 0;
+	    		DelayVal = DelayStorage;
+	    		DownOn = 0;
+	    	}
+	    }
+	    if (Status == 5){
+	    	Status = 3;
+	    }
     }
 
 	if (UpOn == 1){				// Если сработал верний датчик, переводим контроллер в режим 2
-	    if (Status != 4){
-		Status = 2;
+	    if (Status == 0)
+	    {
+	    	Status = 2;
+	    }
+	    if (Status == 1)
+	    {
+	    	Status = 3;
+	    }
+	    if (Status == 4)
+	    {
+	    	if (StatusDark == 1)
+	    	{
+	    		DelayOff = 0;
+	    		DelayVal = DelayDark;
+	    		UpOn = 0;
+	    	}
+	    	else
+	    	{
+	    		DelayOff = 0;
+	    		DelayVal = DelayStorage;
+	    		UpOn = 0;
+	    	}
+	    }
+	    if (Status == 5){
+	    	Status = 3;
+	    }
 	}
-	}
-
-	if ((DownOn == 1) && (UpOn == 1)){	// Если сработали два датчика переводим в режим 3
-	    if (Status != 4){
-		Status = 3;
-	}
-	}
-
-
-
     }
 return 0;
 }

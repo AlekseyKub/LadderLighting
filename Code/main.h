@@ -32,6 +32,8 @@
 
 void StepSetDown(void);
 void StepSetUp(void);
+void StepSetDark(void);
+void AllLiteOff (void);
 
 void delay(uint32_t time_delay)
 		{
